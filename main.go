@@ -71,6 +71,7 @@ func main() {
 
 	drawTotalIssuesOnDate("total_issues.png", issues)
 	drawOpenIssuesOnDate("open_issues.png", issues)
+	drawOpenIssueFractionOnDate("open_fraction.png", issues)
 }
 
 func drawTotalIssuesOnDate(filename string, issues []github.Issue) {
@@ -122,6 +123,42 @@ func drawOpenIssuesOnDate(filename string, issues []github.Issue) {
 	p.Title.Text = "Open Issues/PR"
 	p.X.Label.Text = fmt.Sprintf("Day from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
 	p.Y.Label.Text = "Count"
+	err = plotutil.AddLines(p, pts)
+	if err != nil {
+		panic(err)
+	}
+
+	// Save the plot to a PNG file.
+	if err := p.Save(4*vg.Inch, 4*vg.Inch, filename); err != nil {
+		panic(err)
+	}
+}
+
+func drawOpenIssueFractionOnDate(filename string, issues []github.Issue) {
+	start := firstCreate(issues).Truncate(DayDuration)
+	end := time.Now().Truncate(DayDuration).Add(DayDuration)
+	totalh := totalIssuesCountHistory(issues, start, end)
+	openh := openIssuesCountHistory(issues, start, end)
+
+	fractionh := make([]float64, len(totalh))
+	for i := range totalh {
+		fractionh[i] = float64(openh[i]) / float64(totalh[i])
+	}
+
+	p, err := plot.New()
+	if err != nil {
+		panic(err)
+	}
+
+	pts := make(plotter.XYs, len(fractionh))
+	for i, f := range fractionh {
+		pts[i].X = float64(i)
+		pts[i].Y = f
+	}
+
+	p.Title.Text = "Open:Total Issues/PR"
+	p.X.Label.Text = fmt.Sprintf("Day from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
+	p.Y.Label.Text = "Fraction"
 	err = plotutil.AddLines(p, pts)
 	if err != nil {
 		panic(err)
