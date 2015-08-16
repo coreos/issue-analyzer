@@ -7,6 +7,8 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
+	"runtime"
 	"time"
 
 	"github.com/bmizerany/perks/quantile"
@@ -77,6 +79,10 @@ func main() {
 	drawOpenIssuesOnDate("open_issues.png", issues)
 	drawOpenIssueFractionOnDate("open_fraction.png", issues)
 	drawOpenIssueAgeOnDate("open_age.png", issues)
+	buildImagesHTML("images.html", "total_issues.png", "open_issues.png", "open_fraction.png", "open_age.png")
+	fmt.Printf("saved images and browsing html\n")
+
+	startBrowser("images.html")
 }
 
 func allIssuesInRepo(client *github.Client, owner, repo string) []github.Issue {
@@ -312,4 +318,30 @@ func fileModTime(name string) time.Time {
 		return time.Time{}
 	}
 	return st.ModTime()
+}
+
+func buildImagesHTML(html string, images ...string) {
+	var body string
+	for _, i := range images {
+		body = body + fmt.Sprintf("<img src=%q>\n", i)
+	}
+	err := ioutil.WriteFile(html, []byte(body), 0666)
+	if err != nil {
+		panic(err)
+	}
+}
+
+func startBrowser(url string) bool {
+	// try to start the browser
+	var args []string
+	switch runtime.GOOS {
+	case "darwin":
+		args = []string{"open"}
+	case "windows":
+		args = []string{"cmd", "/c", "start"}
+	default:
+		args = []string{"xdg-open"}
+	}
+	cmd := exec.Command(args[0], append(args[1:], url)...)
+	return cmd.Start() == nil
 }
