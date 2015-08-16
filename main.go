@@ -46,7 +46,10 @@ func main() {
 	client := github.NewClient(c)
 
 	var issues []github.Issue
-	if data, err := ioutil.ReadFile(issueCacheFilename); err != nil {
+	data, err := ioutil.ReadFile(issueCacheFilename)
+	haveCachedIssue := err != nil
+	isUpToDate := time.Now().Sub(fileModTime(issueCacheFilename)) < DayDuration
+	if haveCachedIssue && isUpToDate {
 		issues = allIssuesInRepo(client, "coreos", "etcd")
 		if data, err := json.Marshal(issues); err != nil {
 			fmt.Printf("error marshaling issues (%v)\n", err)
@@ -290,4 +293,16 @@ func firstCreate(issues []github.Issue) time.Time {
 		}
 	}
 	return first
+}
+
+func fileModTime(name string) time.Time {
+	f, err := os.Open(name)
+	if err != nil {
+		return time.Time{}
+	}
+	st, err := f.Stat()
+	if err != nil {
+		return time.Time{}
+	}
+	return st.ModTime()
 }
