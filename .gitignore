@@ -11,4 +11,5 @@ tags
 
 .oauth2_token
 issue-analyzer
-total_issues.png
+*.png
+*.cache
