@@ -24,8 +24,6 @@ const (
 	DayDuration = 24 * time.Hour
 	DateFormat  = "2006-01-02"
 
-	issueCacheFilename = "issues.cache"
-
 	defaultWidth  = 6 * vg.Inch
 	defaultHeight = 4 * vg.Inch
 )
@@ -58,10 +56,17 @@ func main() {
 	client := github.NewClient(c)
 
 	var issues []github.Issue
+	issueCacheFilename := fmt.Sprintf("%s_%s_issues.cache", *owner, *repo)
 	data, err := ioutil.ReadFile(issueCacheFilename)
-	haveCachedIssue := err != nil
+	haveCachedIssue := err == nil
 	isUpToDate := time.Now().Sub(fileModTime(issueCacheFilename)) < DayDuration
 	if haveCachedIssue && isUpToDate {
+		if err := json.Unmarshal(data, &issues); err != nil {
+			fmt.Printf("error loading cached issues (%v)\n", err)
+			fmt.Printf("Please remove file %s and run the command again.", issueCacheFilename)
+			os.Exit(1)
+		}
+	} else {
 		issues = allIssuesInRepo(client, *owner, *repo)
 		if data, err := json.Marshal(issues); err != nil {
 			fmt.Printf("error marshaling issues (%v)\n", err)
@@ -69,12 +74,6 @@ func main() {
 			fmt.Printf("error caching issues into file (%v)\n", err)
 		} else {
 			fmt.Printf("cached issues in file %q for fast retrieval\n", issueCacheFilename)
-		}
-	} else {
-		if err := json.Unmarshal(data, &issues); err != nil {
-			fmt.Printf("error loading cached issues (%v)\n", err)
-			fmt.Printf("Please remove file %s and run the command again.", issueCacheFilename)
-			os.Exit(1)
 		}
 	}
 
