@@ -25,6 +25,9 @@ const (
 	DateFormat  = "2006-01-02"
 
 	issueCacheFilename = "issues.cache"
+
+	defaultWidth  = 6 * vg.Inch
+	defaultHeight = 4 * vg.Inch
 )
 
 func main() {
@@ -141,7 +144,7 @@ func drawTotalIssuesOnDate(filename string, issues []github.Issue) {
 	}
 
 	// Save the plot to a PNG file.
-	if err := p.Save(4*vg.Inch, 4*vg.Inch, filename); err != nil {
+	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
 		panic(err)
 	}
 }
@@ -171,7 +174,7 @@ func drawOpenIssuesOnDate(filename string, issues []github.Issue) {
 	}
 
 	// Save the plot to a PNG file.
-	if err := p.Save(4*vg.Inch, 4*vg.Inch, filename); err != nil {
+	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
 		panic(err)
 	}
 }
@@ -207,7 +210,7 @@ func drawOpenIssueFractionOnDate(filename string, issues []github.Issue) {
 	}
 
 	// Save the plot to a PNG file.
-	if err := p.Save(4*vg.Inch, 4*vg.Inch, filename); err != nil {
+	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
 		panic(err)
 	}
 }
@@ -240,7 +243,7 @@ func drawOpenIssueAgeOnDate(filename string, issues []github.Issue) {
 	}
 
 	// Save the plot to a PNG file.
-	if err := p.Save(4*vg.Inch, 4*vg.Inch, filename); err != nil {
+	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
 		panic(err)
 	}
 }
