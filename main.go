@@ -66,6 +66,7 @@ func main() {
 	}
 
 	drawTotalIssuesOnDate("total_issues.png", issues)
+	drawOpenIssuesOnDate("open_issues.png", issues)
 }
 
 func drawTotalIssuesOnDate(filename string, issues []github.Issue) {
@@ -96,6 +97,52 @@ func drawTotalIssuesOnDate(filename string, issues []github.Issue) {
 	}
 
 	p.Title.Text = "Total Issues/PR"
+	p.X.Label.Text = fmt.Sprintf("Day since %s", start.String())
+	p.Y.Label.Text = "Count"
+	err = plotutil.AddLines(p, pts)
+	if err != nil {
+		panic(err)
+	}
+
+	// Save the plot to a PNG file.
+	if err := p.Save(4*vg.Inch, 4*vg.Inch, filename); err != nil {
+		panic(err)
+	}
+}
+
+func drawOpenIssuesOnDate(filename string, issues []github.Issue) {
+	today := time.Now().Truncate(24 * time.Hour)
+	openm := make(map[time.Time]int)
+	for _, i := range issues {
+		create := i.CreatedAt.Truncate(24 * time.Hour)
+		last := today
+		if i.ClosedAt != nil {
+			last = i.ClosedAt.Truncate(24 * time.Hour)
+		}
+		for k := create; !k.After(last); k = k.Add(24 * time.Hour) {
+			openm[k]++
+		}
+	}
+
+	p, err := plot.New()
+	if err != nil {
+		panic(err)
+	}
+
+	xs := make([]time.Time, 0, len(openm))
+	for t := range openm {
+		xs = append(xs, t)
+	}
+	sort.Sort(timeSlice(xs))
+
+	start := xs[0]
+	pts := make(plotter.XYs, len(openm))
+	for i, x := range xs {
+		pts[i].X = float64(x.Sub(start) / 24 / time.Hour)
+		pts[i].Y = float64(openm[x])
+	}
+
+	p.Title.Text = "Open Issues/PR"
 	p.X.Label.Text = fmt.Sprintf("Day since %s", start.String())
 	p.Y.Label.Text = "Count"
 	err = plotutil.AddLines(p, pts)
