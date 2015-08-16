@@ -1,0 +1,14 @@
+*.swp
+*.pyc
+*Session.vim*
+*.o
+*.a
+*.so
+*.log
+cscope.*
+.*.swo
+tags
+
+.oauth2_token
+issue-analyzer
+total_issues.png
