@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -19,6 +20,8 @@ import (
 const (
 	DayDuration = 24 * time.Hour
 	DateFormat  = "2006-01-02"
+
+	issueCacheFilename = "issues.cache"
 )
 
 func main() {
@@ -38,10 +41,35 @@ func main() {
 			&oauth2.Token{AccessToken: token},
 		)
 		c = oauth2.NewClient(oauth2.NoContext, ts)
-		fmt.Println("Using authenticated client whose rate is up to 5000 requeests per hour.")
+		fmt.Println("Using authenticated client whose rate is up to 5000 requests per hour.")
 	}
 	client := github.NewClient(c)
 
+	var issues []github.Issue
+	if data, err := ioutil.ReadFile(issueCacheFilename); err != nil {
+		issues = allIssuesInRepo(client, "coreos", "etcd")
+		if data, err := json.Marshal(issues); err != nil {
+			fmt.Printf("error marshaling issues (%v)\n", err)
+		} else if err := ioutil.WriteFile(issueCacheFilename, data, 0600); err != nil {
+			fmt.Printf("error caching issues into file (%v)\n", err)
+		} else {
+			fmt.Printf("cached issues in file %q for fast retrieval\n", issueCacheFilename)
+		}
+	} else {
+		if err := json.Unmarshal(data, &issues); err != nil {
+			fmt.Printf("error loading cached issues (%v)\n", err)
+			fmt.Printf("Please remove file %s and run the command again.", issueCacheFilename)
+			os.Exit(1)
+		}
+	}
+
+	drawTotalIssuesOnDate("total_issues.png", issues)
+	drawOpenIssuesOnDate("open_issues.png", issues)
+	drawOpenIssueFractionOnDate("open_fraction.png", issues)
+	drawOpenIssueAgeOnDate("open_age.png", issues)
+}
+
+func allIssuesInRepo(client *github.Client, owner, repo string) []github.Issue {
 	rate, _, err := client.RateLimits()
 	if err != nil {
 		fmt.Printf("error fetching rate limit (%v)\n", err)
@@ -57,7 +85,7 @@ func main() {
 	}
 	var issues []github.Issue
 	for i := 0; ; i++ {
-		is, resp, err := client.Issues.ListByRepo("coreos", "etcd", opt)
+		is, resp, err := client.Issues.ListByRepo(owner, repo, opt)
 		if err != nil {
 			fmt.Printf("error listing issues (%v)\n", err)
 			os.Exit(1)
@@ -69,11 +97,7 @@ func main() {
 		opt.ListOptions.Page = resp.NextPage
 		fmt.Printf("list %d issues...\n", len(issues))
 	}
-
-	drawTotalIssuesOnDate("total_issues.png", issues)
-	drawOpenIssuesOnDate("open_issues.png", issues)
-	drawOpenIssueFractionOnDate("open_fraction.png", issues)
-	drawOpenIssueAgeOnDate("open_age.png", issues)
+	return issues
 }
 
 func drawTotalIssuesOnDate(filename string, issues []github.Issue) {
