@@ -16,6 +16,8 @@ import (
 	"golang.org/x/oauth2"
 )
 
+const DayDuration = 24 * time.Hour
+
 func main() {
 	var token string
 	if data, err := ioutil.ReadFile(".oauth2_token"); err == nil {
@@ -72,7 +74,7 @@ func main() {
 func drawTotalIssuesOnDate(filename string, issues []github.Issue) {
 	creates := make(map[time.Time]int)
 	for _, i := range issues {
-		c := (*i.CreatedAt).Truncate(24 * time.Hour)
+		c := (*i.CreatedAt).Truncate(DayDuration)
 		creates[c]++
 	}
 
@@ -91,7 +93,7 @@ func drawTotalIssuesOnDate(filename string, issues []github.Issue) {
 	pts := make(plotter.XYs, len(creates))
 	var prev int
 	for i, x := range xs {
-		pts[i].X = float64(x.Sub(start) / 24 / time.Hour)
+		pts[i].X = float64(x.Sub(start) / DayDuration)
 		pts[i].Y = float64(prev + creates[x])
 		prev += creates[x]
 	}
@@ -111,15 +113,15 @@ func drawTotalIssuesOnDate(filename string, issues []github.Issue) {
 }
 
 func drawOpenIssuesOnDate(filename string, issues []github.Issue) {
-	today := time.Now().Truncate(24 * time.Hour)
+	today := time.Now().Truncate(DayDuration)
 	openm := make(map[time.Time]int)
 	for _, i := range issues {
-		create := i.CreatedAt.Truncate(24 * time.Hour)
+		create := i.CreatedAt.Truncate(DayDuration)
 		last := today
 		if i.ClosedAt != nil {
-			last = i.ClosedAt.Truncate(24 * time.Hour)
+			last = i.ClosedAt.Truncate(DayDuration)
 		}
-		for k := create; !k.After(last); k = k.Add(24 * time.Hour) {
+		for k := create; !k.After(last); k = k.Add(DayDuration) {
 			openm[k]++
 		}
 	}
@@ -138,7 +140,7 @@ func drawOpenIssuesOnDate(filename string, issues []github.Issue) {
 	start := xs[0]
 	pts := make(plotter.XYs, len(openm))
 	for i, x := range xs {
-		pts[i].X = float64(x.Sub(start) / 24 / time.Hour)
+		pts[i].X = float64(x.Sub(start) / DayDuration)
 		pts[i].Y = float64(openm[x])
 	}
 
