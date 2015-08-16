@@ -56,7 +56,7 @@ func main() {
 	client := github.NewClient(c)
 
 	var issues []github.Issue
-	issueCacheFilename := fmt.Sprintf("%s_%s_issues.cache", *owner, *repo)
+	issueCacheFilename := fmt.Sprintf("cache/%s_%s_issues.cache", *owner, *repo)
 	data, err := ioutil.ReadFile(issueCacheFilename)
 	haveCachedIssue := err == nil
 	isUpToDate := time.Now().Sub(fileModTime(issueCacheFilename)) < DayDuration
