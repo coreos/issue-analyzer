@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
-	"sort"
 	"time"
 
 	"github.com/gonum/plot"
@@ -16,7 +15,10 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const DayDuration = 24 * time.Hour
+const (
+	DayDuration = 24 * time.Hour
+	DateFormat  = "2006-01-02"
+)
 
 func main() {
 	var token string
@@ -72,34 +74,23 @@ func main() {
 }
 
 func drawTotalIssuesOnDate(filename string, issues []github.Issue) {
-	creates := make(map[time.Time]int)
-	for _, i := range issues {
-		c := (*i.CreatedAt).Truncate(DayDuration)
-		creates[c]++
-	}
+	start := firstCreate(issues).Truncate(DayDuration)
+	end := time.Now().Truncate(DayDuration).Add(DayDuration)
+	ch := totalIssuesCountHistory(issues, start, end)
 
 	p, err := plot.New()
 	if err != nil {
 		panic(err)
 	}
 
-	xs := make([]time.Time, 0, len(creates))
-	for t := range creates {
-		xs = append(xs, t)
-	}
-	sort.Sort(timeSlice(xs))
-
-	start := xs[0]
-	pts := make(plotter.XYs, len(creates))
-	var prev int
-	for i, x := range xs {
-		pts[i].X = float64(x.Sub(start) / DayDuration)
-		pts[i].Y = float64(prev + creates[x])
-		prev += creates[x]
+	pts := make(plotter.XYs, len(ch))
+	for i, c := range ch {
+		pts[i].X = float64(i)
+		pts[i].Y = float64(c)
 	}
 
 	p.Title.Text = "Total Issues/PR"
-	p.X.Label.Text = fmt.Sprintf("Day since %s", start.String())
+	p.X.Label.Text = fmt.Sprintf("Day from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
 	p.Y.Label.Text = "Count"
 	err = plotutil.AddLines(p, pts)
 	if err != nil {
@@ -113,39 +104,23 @@ func drawTotalIssuesOnDate(filename string, issues []github.Issue) {
 }
 
 func drawOpenIssuesOnDate(filename string, issues []github.Issue) {
-	today := time.Now().Truncate(DayDuration)
-	openm := make(map[time.Time]int)
-	for _, i := range issues {
-		create := i.CreatedAt.Truncate(DayDuration)
-		last := today
-		if i.ClosedAt != nil {
-			last = i.ClosedAt.Truncate(DayDuration)
-		}
-		for k := create; !k.After(last); k = k.Add(DayDuration) {
-			openm[k]++
-		}
-	}
+	start := firstCreate(issues).Truncate(DayDuration)
+	end := time.Now().Truncate(DayDuration).Add(DayDuration)
+	ch := openIssuesCountHistory(issues, start, end)
 
 	p, err := plot.New()
 	if err != nil {
 		panic(err)
 	}
 
-	xs := make([]time.Time, 0, len(openm))
-	for t := range openm {
-		xs = append(xs, t)
-	}
-	sort.Sort(timeSlice(xs))
-
-	start := xs[0]
-	pts := make(plotter.XYs, len(openm))
-	for i, x := range xs {
-		pts[i].X = float64(x.Sub(start) / DayDuration)
-		pts[i].Y = float64(openm[x])
+	pts := make(plotter.XYs, len(ch))
+	for i, c := range ch {
+		pts[i].X = float64(i)
+		pts[i].Y = float64(c)
 	}
 
 	p.Title.Text = "Open Issues/PR"
-	p.X.Label.Text = fmt.Sprintf("Day since %s", start.String())
+	p.X.Label.Text = fmt.Sprintf("Day from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
 	p.Y.Label.Text = "Count"
 	err = plotutil.AddLines(p, pts)
 	if err != nil {
@@ -158,8 +133,40 @@ func drawOpenIssuesOnDate(filename string, issues []github.Issue) {
 	}
 }
 
-type timeSlice []time.Time
+// Returns count history on total issues per day from the given start
+// to the given end.
+func totalIssuesCountHistory(issues []github.Issue, start, end time.Time) []int {
+	counts := make([]int, end.Sub(start)/DayDuration)
+	for _, i := range issues {
+		c := i.CreatedAt
+		for k := c.Sub(start) / DayDuration; k < end.Sub(start)/DayDuration; k++ {
+			counts[k]++
+		}
+	}
+	return counts
+}
 
-func (s timeSlice) Len() int           { return len(s) }
-func (s timeSlice) Less(i, j int) bool { return s[i].Before(s[j]) }
-func (s timeSlice) Swap(i, j int)      { s[i], s[j] = s[j], s[i] }
+func openIssuesCountHistory(issues []github.Issue, start, end time.Time) []int {
+	counts := make([]int, end.Sub(start)/DayDuration)
+	for _, i := range issues {
+		created := i.CreatedAt
+		closed := end
+		if i.ClosedAt != nil {
+			closed = i.ClosedAt.Add(DayDuration)
+		}
+		for k := created.Sub(start) / DayDuration; k < closed.Sub(start)/DayDuration; k++ {
+			counts[k]++
+		}
+	}
+	return counts
+}
+
+func firstCreate(issues []github.Issue) time.Time {
+	first := time.Now()
+	for _, i := range issues {
+		if i.CreatedAt.Before(first) {
+			first = *i.CreatedAt
+		}
+	}
+	return first
+}
