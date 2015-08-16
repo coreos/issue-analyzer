@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -25,20 +26,26 @@ const (
 )
 
 func main() {
-	var token string
-	if data, err := ioutil.ReadFile(".oauth2_token"); err == nil {
-		token = string(data)
+	owner := flag.String("owner", "coreos", "the owner in github")
+	repo := flag.String("repo", "etcd", "the repo of the owner in github")
+	token := flag.String("token", "", "access token for github")
+	flag.Parse()
+
+	if *token == "" {
+		if data, err := ioutil.ReadFile(".oauth2_token"); err == nil {
+			*token = string(data)
+		}
 	}
 
 	var c *http.Client
-	if token == "" {
+	if *token == "" {
 		fmt.Println("Using unauthenticated client because oauth2 token is unavailable,")
 		fmt.Println("whose rate is limited to 60 requests per hour.")
 		fmt.Println("Learn more about GitHub rate limiting at http://developer.github.com/v3/#rate-limiting.")
 		fmt.Println("If you want to use authenticated client, please save your oauth token into file './.oauth2_token'.")
 	} else {
 		ts := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: token},
+			&oauth2.Token{AccessToken: *token},
 		)
 		c = oauth2.NewClient(oauth2.NoContext, ts)
 		fmt.Println("Using authenticated client whose rate is up to 5000 requests per hour.")
@@ -50,7 +57,7 @@ func main() {
 	haveCachedIssue := err != nil
 	isUpToDate := time.Now().Sub(fileModTime(issueCacheFilename)) < DayDuration
 	if haveCachedIssue && isUpToDate {
-		issues = allIssuesInRepo(client, "coreos", "etcd")
+		issues = allIssuesInRepo(client, *owner, *repo)
 		if data, err := json.Marshal(issues); err != nil {
 			fmt.Printf("error marshaling issues (%v)\n", err)
 		} else if err := ioutil.WriteFile(issueCacheFilename, data, 0600); err != nil {
