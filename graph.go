@@ -2,40 +2,40 @@ package main
 
 import (
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/bmizerany/perks/quantile"
 	"github.com/gonum/plot"
-	"github.com/gonum/plot/plotter"
 	"github.com/gonum/plot/plotutil"
 	"github.com/google/go-github/github"
 )
 
-func drawTotalIssuesOnDate(filename string, issues []github.Issue) {
-	start := firstCreate(issues).Truncate(DayDuration)
+func drawTotalIssues(ctx *context, filename string) {
+	start := firstCreate(ctx.issues).Truncate(DayDuration)
 	end := time.Now().Truncate(DayDuration).Add(DayDuration)
-	ch := totalIssuesCountHistory(issues, start, end)
-	prch := totalPRCountHistory(issues, start, end)
+
+	issues := make([]int, end.Sub(start)/DayDuration)
+	prs := make([]int, end.Sub(start)/DayDuration)
+	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
+		c := i.CreatedAt
+		for k := c.Sub(start) / DayDuration; k < end.Sub(start)/DayDuration; k++ {
+			if isPullRequest {
+				prs[k]++
+			} else {
+				issues[k]++
+			}
+		}
+	})
 
 	p, err := plot.New()
 	if err != nil {
 		panic(err)
-	}
-
-	pts := make(plotter.XYs, len(ch))
-	prpts := make(plotter.XYs, len(ch))
-	for i := range ch {
-		pts[i].X = float64(i)
-		pts[i].Y = float64(ch[i])
-		prpts[i].X = float64(i)
-		prpts[i].Y = float64(prch[i])
 	}
 
 	p.Title.Text = "Total Issues/PR"
 	p.X.Label.Text = fmt.Sprintf("Day from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
 	p.Y.Label.Text = "Count"
-	err = plotutil.AddLines(p, "issues", pts, "PRs", prpts)
+	err = plotutil.AddLines(p, "issues", seqInts(issues), "PRs", seqInts(prs))
 	if err != nil {
 		panic(err)
 	}
@@ -46,30 +46,36 @@ func drawTotalIssuesOnDate(filename string, issues []github.Issue) {
 	}
 }
 
-func drawOpenIssuesOnDate(filename string, issues []github.Issue) {
-	start := firstCreate(issues).Truncate(DayDuration)
+func drawOpenIssues(ctx *context, filename string) {
+	start := firstCreate(ctx.issues).Truncate(DayDuration)
 	end := time.Now().Truncate(DayDuration).Add(DayDuration)
-	ch := openIssuesCountHistory(issues, start, end)
-	prch := openPRCountHistory(issues, start, end)
+
+	issues := make([]int, end.Sub(start)/DayDuration)
+	prs := make([]int, end.Sub(start)/DayDuration)
+	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
+		created := i.CreatedAt
+		closed := end
+		if i.ClosedAt != nil {
+			closed = *i.ClosedAt
+		}
+		for k := created.Sub(start) / DayDuration; k < closed.Sub(start)/DayDuration; k++ {
+			if isPullRequest {
+				prs[k]++
+			} else {
+				issues[k]++
+			}
+		}
+	})
 
 	p, err := plot.New()
 	if err != nil {
 		panic(err)
-	}
-
-	pts := make(plotter.XYs, len(ch))
-	prpts := make(plotter.XYs, len(ch))
-	for i := range ch {
-		pts[i].X = float64(i)
-		pts[i].Y = float64(ch[i])
-		prpts[i].X = float64(i)
-		prpts[i].Y = float64(prch[i])
 	}
 
 	p.Title.Text = "Open Issues/PR"
 	p.X.Label.Text = fmt.Sprintf("Day from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
 	p.Y.Label.Text = "Count"
-	err = plotutil.AddLines(p, "issues", pts, "PRs", prpts)
+	err = plotutil.AddLines(p, "issues", seqInts(issues), "PRs", seqInts(prs))
 	if err != nil {
 		panic(err)
 	}
@@ -80,35 +86,45 @@ func drawOpenIssuesOnDate(filename string, issues []github.Issue) {
 	}
 }
 
-func drawOpenIssueFractionOnDate(filename string, issues []github.Issue) {
-	start := firstCreate(issues).Truncate(DayDuration)
+func drawOpenIssueFraction(ctx *context, filename string) {
+	start := firstCreate(ctx.issues).Truncate(DayDuration)
 	end := time.Now().Truncate(DayDuration).Add(DayDuration)
-	totalh := totalIssuesCountHistory(issues, start, end)
-	openh := openIssuesCountHistory(issues, start, end)
 
-	fractionh := make([]float64, len(totalh))
-	for i := range totalh {
-		if totalh[i] == 0 {
-			continue
+	totals := make([]int, end.Sub(start)/DayDuration)
+	opens := make([]int, end.Sub(start)/DayDuration)
+	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
+		if isPullRequest {
+			return
 		}
-		fractionh[i] = float64(openh[i]) / float64(totalh[i])
+		created := i.CreatedAt
+		closed := end
+		if i.ClosedAt != nil {
+			closed = *i.ClosedAt
+		}
+		for k := created.Sub(start) / DayDuration; k < end.Sub(start)/DayDuration; k++ {
+			totals[k]++
+		}
+		for k := created.Sub(start) / DayDuration; k < closed.Sub(start)/DayDuration; k++ {
+			opens[k]++
+		}
+	})
+
+	fractions := make([]float64, len(totals))
+	for i := range totals {
+		if totals[i] != 0 {
+			fractions[i] = float64(opens[i]) / float64(totals[i])
+		}
 	}
 
 	p, err := plot.New()
 	if err != nil {
 		panic(err)
-	}
-
-	pts := make(plotter.XYs, len(fractionh))
-	for i, f := range fractionh {
-		pts[i].X = float64(i)
-		pts[i].Y = f
 	}
 
 	p.Title.Text = "Open:Total Issues"
 	p.X.Label.Text = fmt.Sprintf("Day from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
 	p.Y.Label.Text = "Fraction"
-	err = plotutil.AddLines(p, pts)
+	err = plotutil.AddLines(p, seqFloats(fractions))
 	if err != nil {
 		panic(err)
 	}
@@ -119,29 +135,38 @@ func drawOpenIssueFractionOnDate(filename string, issues []github.Issue) {
 	}
 }
 
-func drawOpenIssueAgeOnDate(filename string, issues []github.Issue) {
-	start := firstCreate(issues).Truncate(DayDuration)
+func drawOpenIssueAge(ctx *context, filename string) {
+	start := firstCreate(ctx.issues).Truncate(DayDuration)
 	end := time.Now().Truncate(DayDuration).Add(DayDuration)
-	qh := openDaysQuantileHistory(issues, start, end, 0.25, 0.50, 0.75)
+
+	qs := make([]*quantile.Stream, end.Sub(start)/DayDuration)
+	for i := range qs {
+		qs[i] = quantile.NewTargeted(0.25, 0.50, 0.75)
+	}
+	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
+		if isPullRequest {
+			return
+		}
+		created := i.CreatedAt
+		closed := end
+		if i.ClosedAt != nil {
+			closed = *i.ClosedAt
+		}
+		firsti := created.Sub(start) / DayDuration
+		for k := firsti; k < closed.Sub(start)/DayDuration; k++ {
+			qs[k].Insert(float64(k - firsti))
+		}
+	})
 
 	p, err := plot.New()
 	if err != nil {
 		panic(err)
-	}
-
-	p25_pts := make(plotter.XYs, len(qh))
-	p50_pts := make(plotter.XYs, len(qh))
-	p75_pts := make(plotter.XYs, len(qh))
-	for i, q := range qh {
-		p25_pts[i].X, p25_pts[i].Y = float64(i), q.Query(0.25)
-		p50_pts[i].X, p50_pts[i].Y = float64(i), q.Query(0.50)
-		p75_pts[i].X, p75_pts[i].Y = float64(i), q.Query(0.75)
 	}
 
 	p.Title.Text = "Age of Open Issues"
 	p.X.Label.Text = fmt.Sprintf("Day from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
 	p.Y.Label.Text = "Age (days)"
-	err = plotutil.AddLines(p, "25th percentile", p25_pts, "Median", p50_pts, "75th percentile", p75_pts)
+	err = plotutil.AddLines(p, "25th percentile", quantileAt(qs, 0.25), "Median", quantileAt(qs, 0.50), "75th percentile", quantileAt(qs, 0.75))
 	if err != nil {
 		panic(err)
 	}
@@ -152,41 +177,37 @@ func drawOpenIssueAgeOnDate(filename string, issues []github.Issue) {
 	}
 }
 
-func drawIssueSolvedDurationOnDate(filename string, issues []github.Issue) {
-	start := firstCreate(issues).Truncate(DayDuration)
-	end := time.Now().Truncate(DayDuration).Add(WeekDuration)
-	qh := issueResolvedDurationQuantileHistory(issues, start, end, 0.50, 0.90, 0.99)
+func drawIssueSolvedDuration(ctx *context, filename string) {
+	start := firstCreate(ctx.issues).Truncate(MonthDuration)
+	end := time.Now().Truncate(DayDuration).Add(MonthDuration)
+
+	qs := make([]*quantile.Stream, end.Sub(start)/MonthDuration)
+	for i := range qs {
+		qs[i] = quantile.NewTargeted(0.25, 0.50, 0.75)
+	}
+	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
+		if isPullRequest {
+			return
+		}
+		// count unresolved as the longest period
+		d := end.Sub(start)
+		if i.ClosedAt != nil {
+			d = i.ClosedAt.Sub(*i.CreatedAt)
+		}
+		for k := i.CreatedAt.Sub(start) / MonthDuration; k < end.Sub(start)/MonthDuration; k++ {
+			qs[k].Insert(float64(d) / float64(DayDuration))
+		}
+	})
 
 	p, err := plot.New()
 	if err != nil {
 		panic(err)
 	}
 
-	p25_pts := make(plotter.XYs, len(qh))
-	p50_pts := make(plotter.XYs, len(qh))
-	p75_pts := make(plotter.XYs, len(qh))
-	for i, q := range qh {
-		if q.Query(0.50) != 0 {
-			p25_pts[i].X, p25_pts[i].Y = float64(i), math.Log2(q.Query(0.50))
-		} else {
-			p25_pts[i].X, p25_pts[i].Y = float64(i), 0
-		}
-		if q.Query(0.90) != 0 {
-			p50_pts[i].X, p50_pts[i].Y = float64(i), math.Log2(q.Query(0.90))
-		} else {
-			p50_pts[i].X, p50_pts[i].Y = float64(i), 0
-		}
-		if q.Query(0.99) != 0 {
-			p75_pts[i].X, p75_pts[i].Y = float64(i), math.Log2(q.Query(0.99))
-		} else {
-			p75_pts[i].X, p75_pts[i].Y = float64(i), 0
-		}
-	}
-
 	p.Title.Text = "Solved Duration of Issues"
-	p.X.Label.Text = fmt.Sprintf("Week from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
-	p.Y.Label.Text = "Log2 Duration (days)"
-	err = plotutil.AddLines(p, "Median", p25_pts, "90th percentile", p50_pts, "99th percentile", p75_pts)
+	p.X.Label.Text = fmt.Sprintf("Month from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
+	p.Y.Label.Text = "Duration (days)"
+	err = plotutil.AddLines(p, "25th percentile", quantileAt(qs, 0.25), "50th percentile", quantileAt(qs, 0.50), "75th percentile", quantileAt(qs, 0.75))
 	if err != nil {
 		panic(err)
 	}
@@ -197,6 +218,7 @@ func drawIssueSolvedDurationOnDate(filename string, issues []github.Issue) {
 	}
 }
 
+/*
 func drawNewIssuesOnDate(filename string, issues []github.Issue) {
 	start := firstCreate(issues).Truncate(WeekDuration)
 	end := time.Now().Truncate(DayDuration).Add(WeekDuration)
@@ -347,122 +369,6 @@ func drawRelease(filename string, client *github.Client, owner, repo string) {
 	//	}
 }
 
-// Returns count history on total issues per day from the given start
-// to the given end.
-func totalIssuesCountHistory(issues []github.Issue, start, end time.Time) []int {
-	counts := make([]int, end.Sub(start)/DayDuration)
-	for _, i := range issues {
-		if i.PullRequestLinks != nil {
-			continue
-		}
-		c := i.CreatedAt
-		for k := c.Sub(start) / DayDuration; k < end.Sub(start)/DayDuration; k++ {
-			counts[k]++
-		}
-	}
-	return counts
-}
-
-func totalPRCountHistory(issues []github.Issue, start, end time.Time) []int {
-	counts := make([]int, end.Sub(start)/DayDuration)
-	for _, i := range issues {
-		if i.PullRequestLinks == nil {
-			continue
-		}
-		c := i.CreatedAt
-		for k := c.Sub(start) / DayDuration; k < end.Sub(start)/DayDuration; k++ {
-			counts[k]++
-		}
-	}
-	return counts
-}
-
-func openIssuesCountHistory(issues []github.Issue, start, end time.Time) []int {
-	counts := make([]int, end.Sub(start)/DayDuration)
-	for _, i := range issues {
-		if i.PullRequestLinks != nil {
-			continue
-		}
-		created := i.CreatedAt
-		closed := end
-		if i.ClosedAt != nil {
-			closed = *i.ClosedAt
-		}
-		for k := created.Sub(start) / DayDuration; k < closed.Sub(start)/DayDuration; k++ {
-			counts[k]++
-		}
-	}
-	return counts
-}
-
-func openPRCountHistory(issues []github.Issue, start, end time.Time) []int {
-	counts := make([]int, end.Sub(start)/DayDuration)
-	for _, i := range issues {
-		if i.PullRequestLinks == nil {
-			continue
-		}
-		created := i.CreatedAt
-		closed := end
-		if i.ClosedAt != nil {
-			closed = *i.ClosedAt
-		}
-		for k := created.Sub(start) / DayDuration; k < closed.Sub(start)/DayDuration; k++ {
-			counts[k]++
-		}
-	}
-	return counts
-}
-
-// quantileHints helps to calculate quantile values with less resources and finer error guarantees.
-func openDaysQuantileHistory(issues []github.Issue, start, end time.Time, quantileHints ...float64) []*quantile.Stream {
-	qs := make([]*quantile.Stream, end.Sub(start)/DayDuration)
-	for i := range qs {
-		if len(quantileHints) != 0 {
-			qs[i] = quantile.NewTargeted(quantileHints...)
-		} else {
-			qs[i] = quantile.NewBiased()
-		}
-	}
-	for _, i := range issues {
-		if i.PullRequestLinks != nil {
-			continue
-		}
-		created := i.CreatedAt
-		closed := end
-		if i.ClosedAt != nil {
-			closed = *i.ClosedAt
-		}
-
-		firsti := created.Sub(start) / DayDuration
-		for k := firsti; k < closed.Sub(start)/DayDuration; k++ {
-			qs[k].Insert(float64(k - firsti))
-		}
-	}
-	return qs
-}
-
-func issueResolvedDurationQuantileHistory(issues []github.Issue, start, end time.Time, quantileHints ...float64) []*quantile.Stream {
-	qs := make([]*quantile.Stream, end.Sub(start)/WeekDuration)
-	for i := range qs {
-		if len(quantileHints) != 0 {
-			qs[i] = quantile.NewTargeted(quantileHints...)
-		} else {
-			qs[i] = quantile.NewBiased()
-		}
-	}
-	for _, i := range issues {
-		if i.PullRequestLinks != nil {
-			continue
-		}
-		d := end.Sub(start)
-		if i.ClosedAt != nil {
-			d = i.ClosedAt.Sub(*i.CreatedAt)
-		}
-		qs[i.CreatedAt.Sub(start)/WeekDuration].Insert(float64(d) / float64(DayDuration))
-	}
-	return qs
-}
-
 func newIssuesCountHistory(issues []github.Issue, start, end time.Time) []int {
 	counts := make([]int, end.Sub(start)/WeekDuration)
 	for _, i := range issues {
@@ -582,6 +488,7 @@ func openExternalPRCountHistory(issues []github.Issue, start, end time.Time) []i
 	}
 	return counts
 }
+*/
 
 func firstCreate(issues []github.Issue) time.Time {
 	first := time.Now()
@@ -591,4 +498,22 @@ func firstCreate(issues []github.Issue) time.Time {
 		}
 	}
 	return first
+}
+
+type seqInts []int
+
+func (xys seqInts) Len() int                { return len(xys) }
+func (xys seqInts) XY(i int) (x, y float64) { return float64(i), float64(xys[i]) }
+
+type seqFloats []float64
+
+func (xys seqFloats) Len() int                { return len(xys) }
+func (xys seqFloats) XY(i int) (x, y float64) { return float64(i), xys[i] }
+
+func quantileAt(ss []*quantile.Stream, q float64) seqFloats {
+	fs := make(seqFloats, len(ss))
+	for i := range ss {
+		fs[i] = ss[i].Query(q)
+	}
+	return fs
 }

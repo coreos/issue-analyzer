@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
 	"io/ioutil"
@@ -17,9 +16,10 @@ import (
 )
 
 const (
-	DayDuration  = 24 * time.Hour
-	WeekDuration = 7 * DayDuration
-	DateFormat   = "2006-01-02"
+	DayDuration   = 24 * time.Hour
+	WeekDuration  = 7 * DayDuration
+	MonthDuration = 30 * DayDuration
+	DateFormat    = "2006-01-02"
 
 	defaultWidth  = 6 * vg.Inch
 	defaultHeight = 4 * vg.Inch
@@ -52,79 +52,25 @@ func main() {
 	}
 	client := github.NewClient(c)
 
-	var issues []github.Issue
-	issueCacheFilename := fmt.Sprintf("cache/%s_%s_issues.cache", *owner, *repo)
-	data, err := ioutil.ReadFile(issueCacheFilename)
-	haveCachedIssue := err == nil
-	isUpToDate := time.Now().Sub(fileModTime(issueCacheFilename)) < DayDuration
-	if haveCachedIssue && isUpToDate {
-		if err := json.Unmarshal(data, &issues); err != nil {
-			fmt.Printf("error loading cached issues (%v)\n", err)
-			fmt.Printf("Please remove file %s and run the command again.", issueCacheFilename)
-			os.Exit(1)
-		}
-	} else {
-		issues = allIssuesInRepo(client, *owner, *repo)
-		if data, err := json.Marshal(issues); err != nil {
-			fmt.Printf("error marshaling issues (%v)\n", err)
-		} else if err := ioutil.WriteFile(issueCacheFilename, data, 0600); err != nil {
-			fmt.Printf("error caching issues into file (%v)\n", err)
-		} else {
-			fmt.Printf("cached issues in file %q for fast retrieval\n", issueCacheFilename)
-		}
+	ctx := &context{
+		client: client,
+		owner:  *owner,
+		repo:   *repo,
+	}
+	if err := ctx.LoadIssues(); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
 	}
 
-	drawTotalIssuesOnDate("total_issues.png", issues)
-	drawOpenIssuesOnDate("open_issues.png", issues)
-	drawOpenIssueFractionOnDate("open_fraction.png", issues)
-	drawOpenIssueAgeOnDate("open_age.png", issues)
-	buildImagesHTML("images.html", "total_issues.png", "open_issues.png", "open_fraction.png", "open_age.png")
+	drawTotalIssues(ctx, "total_issues.png")
+	drawOpenIssues(ctx, "open_issues.png")
+	drawOpenIssueFraction(ctx, "open_fraction.png")
+	drawOpenIssueAge(ctx, "open_age.png")
+	drawIssueSolvedDuration(ctx, "solved_duration.png")
+	buildImagesHTML("images.html", "total_issues.png", "open_issues.png", "open_fraction.png", "open_age.png", "solved_duration.png")
 	fmt.Printf("saved images and browsing html\n")
 
 	startBrowser("images.html")
-}
-
-func allIssuesInRepo(client *github.Client, owner, repo string) []github.Issue {
-	rate, _, err := client.RateLimits()
-	if err != nil {
-		fmt.Printf("error fetching rate limit (%v)\n", err)
-	} else {
-		fmt.Printf("API Rate Limit: %s\n", rate)
-	}
-
-	opt := &github.IssueListByRepoOptions{
-		State: "all",
-		ListOptions: github.ListOptions{
-			PerPage: 100,
-		},
-	}
-	var issues []github.Issue
-	for i := 0; ; i++ {
-		is, resp, err := client.Issues.ListByRepo(owner, repo, opt)
-		if err != nil {
-			fmt.Printf("error listing issues (%v)\n", err)
-			os.Exit(1)
-		}
-		issues = append(issues, is...)
-		if resp.NextPage == 0 {
-			break
-		}
-		opt.ListOptions.Page = resp.NextPage
-		fmt.Printf("list %d issues...\n", len(issues))
-	}
-	return issues
-}
-
-func fileModTime(name string) time.Time {
-	f, err := os.Open(name)
-	if err != nil {
-		return time.Time{}
-	}
-	st, err := f.Stat()
-	if err != nil {
-		return time.Time{}
-	}
-	return st.ModTime()
 }
 
 func buildImagesHTML(html string, images ...string) {
