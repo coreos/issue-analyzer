@@ -17,8 +17,9 @@ import (
 )
 
 const (
-	DayDuration = 24 * time.Hour
-	DateFormat  = "2006-01-02"
+	DayDuration  = 24 * time.Hour
+	WeekDuration = 7 * DayDuration
+	DateFormat   = "2006-01-02"
 
 	defaultWidth  = 6 * vg.Inch
 	defaultHeight = 4 * vg.Inch
