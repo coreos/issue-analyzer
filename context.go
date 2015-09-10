@@ -37,6 +37,18 @@ func (c *context) LoadReleases() {
 	writeJson(cacheFilename, c.releases)
 }
 
+func (c *context) StartTime() time.Time {
+	first := time.Now()
+	for _, i := range c.issues {
+		if i.CreatedAt.Before(first) {
+			first = *i.CreatedAt
+		}
+	}
+	return first
+}
+
+func (c *context) EndTime() time.Time { return time.Now() }
+
 func (c *context) WalkIssues(f func(issue github.Issue, isPullRequest bool)) {
 	for _, issue := range c.issues {
 		f(issue, issue.PullRequestLinks != nil)

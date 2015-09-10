@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/bmizerany/perks/quantile"
 	"github.com/gonum/plot"
@@ -11,14 +10,14 @@ import (
 )
 
 func drawTotalIssues(ctx *context, filename string) {
-	start := firstCreate(ctx.issues).Truncate(DayDuration)
-	end := time.Now().Truncate(DayDuration).Add(DayDuration)
+	start, end := ctx.StartTime(), ctx.EndTime()
 
-	issues := make([]int, end.Sub(start)/DayDuration)
-	prs := make([]int, end.Sub(start)/DayDuration)
+	l := end.Sub(start)/DayDuration + 1
+	issues := make([]int, l)
+	prs := make([]int, l)
 	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
 		c := i.CreatedAt
-		for k := c.Sub(start) / DayDuration; k < end.Sub(start)/DayDuration; k++ {
+		for k := c.Sub(start) / DayDuration; k <= end.Sub(start)/DayDuration; k++ {
 			if isPullRequest {
 				prs[k]++
 			} else {
@@ -47,18 +46,18 @@ func drawTotalIssues(ctx *context, filename string) {
 }
 
 func drawOpenIssues(ctx *context, filename string) {
-	start := firstCreate(ctx.issues).Truncate(DayDuration)
-	end := time.Now().Truncate(DayDuration).Add(DayDuration)
+	start, end := ctx.StartTime(), ctx.EndTime()
 
-	issues := make([]int, end.Sub(start)/DayDuration)
-	prs := make([]int, end.Sub(start)/DayDuration)
+	l := end.Sub(start)/DayDuration + 1
+	issues := make([]int, l)
+	prs := make([]int, l)
 	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
 		created := i.CreatedAt
 		closed := end
 		if i.ClosedAt != nil {
 			closed = *i.ClosedAt
 		}
-		for k := created.Sub(start) / DayDuration; k < closed.Sub(start)/DayDuration; k++ {
+		for k := created.Sub(start) / DayDuration; k <= closed.Sub(start)/DayDuration; k++ {
 			if isPullRequest {
 				prs[k]++
 			} else {
@@ -87,11 +86,11 @@ func drawOpenIssues(ctx *context, filename string) {
 }
 
 func drawOpenIssueFraction(ctx *context, filename string) {
-	start := firstCreate(ctx.issues).Truncate(DayDuration)
-	end := time.Now().Truncate(DayDuration).Add(DayDuration)
+	start, end := ctx.StartTime(), ctx.EndTime()
 
-	totals := make([]int, end.Sub(start)/DayDuration)
-	opens := make([]int, end.Sub(start)/DayDuration)
+	l := end.Sub(start)/DayDuration + 1
+	totals := make([]int, l)
+	opens := make([]int, l)
 	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
 		if isPullRequest {
 			return
@@ -101,10 +100,10 @@ func drawOpenIssueFraction(ctx *context, filename string) {
 		if i.ClosedAt != nil {
 			closed = *i.ClosedAt
 		}
-		for k := created.Sub(start) / DayDuration; k < end.Sub(start)/DayDuration; k++ {
+		for k := created.Sub(start) / DayDuration; k <= end.Sub(start)/DayDuration; k++ {
 			totals[k]++
 		}
-		for k := created.Sub(start) / DayDuration; k < closed.Sub(start)/DayDuration; k++ {
+		for k := created.Sub(start) / DayDuration; k <= closed.Sub(start)/DayDuration; k++ {
 			opens[k]++
 		}
 	})
@@ -136,10 +135,10 @@ func drawOpenIssueFraction(ctx *context, filename string) {
 }
 
 func drawOpenIssueAge(ctx *context, filename string) {
-	start := firstCreate(ctx.issues).Truncate(DayDuration)
-	end := time.Now().Truncate(DayDuration).Add(DayDuration)
+	start, end := ctx.StartTime(), ctx.EndTime()
 
-	qs := make([]*quantile.Stream, end.Sub(start)/DayDuration)
+	l := end.Sub(start)/DayDuration + 1
+	qs := make([]*quantile.Stream, l)
 	for i := range qs {
 		qs[i] = quantile.NewTargeted(0.25, 0.50, 0.75)
 	}
@@ -153,7 +152,7 @@ func drawOpenIssueAge(ctx *context, filename string) {
 			closed = *i.ClosedAt
 		}
 		firsti := created.Sub(start) / DayDuration
-		for k := firsti; k < closed.Sub(start)/DayDuration; k++ {
+		for k := firsti; k <= closed.Sub(start)/DayDuration; k++ {
 			qs[k].Insert(float64(k - firsti))
 		}
 	})
@@ -178,10 +177,10 @@ func drawOpenIssueAge(ctx *context, filename string) {
 }
 
 func drawIssueSolvedDuration(ctx *context, filename string) {
-	start := firstCreate(ctx.issues).Truncate(MonthDuration)
-	end := time.Now().Truncate(DayDuration).Add(MonthDuration)
+	start, end := ctx.StartTime(), ctx.EndTime()
 
-	qs := make([]*quantile.Stream, end.Sub(start)/MonthDuration)
+	l := end.Sub(start)/MonthDuration + 1
+	qs := make([]*quantile.Stream, l)
 	for i := range qs {
 		qs[i] = quantile.NewTargeted(0.25, 0.50, 0.75)
 	}
@@ -194,7 +193,7 @@ func drawIssueSolvedDuration(ctx *context, filename string) {
 		if i.ClosedAt != nil {
 			d = i.ClosedAt.Sub(*i.CreatedAt)
 		}
-		for k := i.CreatedAt.Sub(start) / MonthDuration; k < end.Sub(start)/MonthDuration; k++ {
+		for k := i.CreatedAt.Sub(start) / MonthDuration; k <= end.Sub(start)/MonthDuration; k++ {
 			qs[k].Insert(float64(d) / float64(DayDuration))
 		}
 	})
@@ -216,16 +215,6 @@ func drawIssueSolvedDuration(ctx *context, filename string) {
 	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
 		panic(err)
 	}
-}
-
-func firstCreate(issues []github.Issue) time.Time {
-	first := time.Now()
-	for _, i := range issues {
-		if i.CreatedAt.Before(first) {
-			first = *i.CreatedAt
-		}
-	}
-	return first
 }
 
 type seqInts []int
