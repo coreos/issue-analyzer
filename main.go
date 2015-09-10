@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
-	"os"
 	"os/exec"
 	"runtime"
 	"time"
@@ -57,10 +56,7 @@ func main() {
 		owner:  *owner,
 		repo:   *repo,
 	}
-	if err := ctx.LoadIssues(); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
+	ctx.LoadIssues()
 
 	drawTotalIssues(ctx, "total_issues.png")
 	drawOpenIssues(ctx, "open_issues.png")
