@@ -182,7 +182,7 @@ func drawIssueSolvedDuration(ctx *context, filename string) {
 	l := end.Sub(start)/MonthDuration + 1
 	qs := make([]*quantile.Stream, l)
 	for i := range qs {
-		qs[i] = quantile.NewTargeted(0.25, 0.50, 0.75)
+		qs[i] = quantile.NewTargeted(0.50)
 	}
 	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
 		if isPullRequest {
@@ -206,7 +206,7 @@ func drawIssueSolvedDuration(ctx *context, filename string) {
 	p.Title.Text = "Solved Duration of Issues"
 	p.X.Label.Text = fmt.Sprintf("Month from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
 	p.Y.Label.Text = "Duration (days)"
-	err = plotutil.AddLines(p, "25th percentile", quantileAt(qs, 0.25), "50th percentile", quantileAt(qs, 0.50), "75th percentile", quantileAt(qs, 0.75))
+	err = plotutil.AddLines(p, "Median", quantileAt(qs, 0.50))
 	if err != nil {
 		panic(err)
 	}
