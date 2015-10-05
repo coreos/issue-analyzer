@@ -2,10 +2,13 @@ package main
 
 import (
 	"fmt"
+	"sort"
 
 	"github.com/bmizerany/perks/quantile"
 	"github.com/gonum/plot"
+	"github.com/gonum/plot/plotter"
 	"github.com/gonum/plot/plotutil"
+	"github.com/gonum/plot/vg"
 	"github.com/google/go-github/github"
 )
 
@@ -217,6 +220,45 @@ func drawIssueSolvedDuration(ctx *context, filename string) {
 	}
 }
 
+func drawTopReleaseDownloads(ctx *context, filename string) {
+	var rs releases
+	ctx.WalkReleases(func(r github.RepositoryRelease) {
+		var cnt int
+		for _, a := range r.Assets {
+			cnt += *a.DownloadCount
+		}
+		rs = append(rs, release{name: *r.TagName, download: cnt})
+	})
+	sort.Sort(rs)
+
+	var names []string
+	var downloads []int
+	for i := 0; i < 10; i++ {
+		names = append(names, rs[i].name)
+		downloads = append(downloads, rs[i].download)
+	}
+
+	p, err := plot.New()
+	if err != nil {
+		panic(err)
+	}
+
+	p.Title.Text = "Release Downloads"
+	p.Y.Label.Text = "Download Count"
+	p.NominalX(names...)
+	bars, err := plotter.NewBarChart(ints(downloads), vg.Points(20))
+	if err != nil {
+		panic(err)
+	}
+	bars.LineStyle.Width = vg.Length(0)
+	p.Add(bars)
+
+	// Save the plot to a PNG file.
+	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
+		panic(err)
+	}
+}
+
 type seqInts []int
 
 func (xys seqInts) Len() int                { return len(xys) }
@@ -226,6 +268,22 @@ type seqFloats []float64
 
 func (xys seqFloats) Len() int                { return len(xys) }
 func (xys seqFloats) XY(i int) (x, y float64) { return float64(i), xys[i] }
+
+type ints []int
+
+func (a ints) Len() int            { return len(a) }
+func (a ints) Value(i int) float64 { return float64(a[i]) }
+
+type release struct {
+	name     string
+	download int
+}
+
+type releases []release
+
+func (a releases) Len() int           { return len(a) }
+func (a releases) Less(i, j int) bool { return a[i].download > a[j].download }
+func (a releases) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 
 func quantileAt(ss []*quantile.Stream, q float64) seqFloats {
 	fs := make(seqFloats, len(ss))

@@ -55,6 +55,12 @@ func (c *context) WalkIssues(f func(issue github.Issue, isPullRequest bool)) {
 	}
 }
 
+func (c *context) WalkReleases(f func(r github.RepositoryRelease)) {
+	for _, r := range c.releases {
+		f(r)
+	}
+}
+
 func (c *context) fetchReleases() []github.RepositoryRelease {
 	opt := &github.ListOptions{
 		PerPage: 100,

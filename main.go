@@ -57,13 +57,15 @@ func main() {
 		repo:   *repo,
 	}
 	ctx.LoadIssues()
+	ctx.LoadReleases()
 
 	drawTotalIssues(ctx, "total_issues.png")
 	drawOpenIssues(ctx, "open_issues.png")
 	drawOpenIssueFraction(ctx, "open_fraction.png")
 	drawOpenIssueAge(ctx, "open_age.png")
 	drawIssueSolvedDuration(ctx, "solved_duration.png")
-	buildImagesHTML("images.html", "total_issues.png", "open_issues.png", "open_fraction.png", "open_age.png", "solved_duration.png")
+	drawTopReleaseDownloads(ctx, "top_downloads.png")
+	buildImagesHTML("images.html", "total_issues.png", "open_issues.png", "open_fraction.png", "open_age.png", "solved_duration.png", "top_downloads.png")
 	fmt.Printf("saved images and browsing html\n")
 
 	startBrowser("images.html")
