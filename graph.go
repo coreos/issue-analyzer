@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"sort"
+	"time"
 
 	"github.com/bmizerany/perks/quantile"
 	"github.com/gonum/plot"
@@ -35,12 +36,13 @@ func drawTotalIssues(ctx *context, filename string) {
 	}
 
 	p.Title.Text = "Total Issues/PR"
-	p.X.Label.Text = fmt.Sprintf("Day from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
+	p.X.Label.Text = fmt.Sprintf("Date from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
 	p.Y.Label.Text = "Count"
 	err = plotutil.AddLines(p, "issues", seqInts(issues), "PRs", seqInts(prs))
 	if err != nil {
 		panic(err)
 	}
+	p.X.Tick.Marker = newDayTicker(p.X.Tick.Marker, start)
 
 	// Save the plot to a PNG file.
 	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
@@ -75,12 +77,13 @@ func drawOpenIssues(ctx *context, filename string) {
 	}
 
 	p.Title.Text = "Open Issues/PR"
-	p.X.Label.Text = fmt.Sprintf("Day from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
+	p.X.Label.Text = fmt.Sprintf("Date from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
 	p.Y.Label.Text = "Count"
 	err = plotutil.AddLines(p, "issues", seqInts(issues), "PRs", seqInts(prs))
 	if err != nil {
 		panic(err)
 	}
+	p.X.Tick.Marker = newDayTicker(p.X.Tick.Marker, start)
 
 	// Save the plot to a PNG file.
 	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
@@ -124,12 +127,13 @@ func drawOpenIssueFraction(ctx *context, filename string) {
 	}
 
 	p.Title.Text = "Open:Total Issues"
-	p.X.Label.Text = fmt.Sprintf("Day from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
+	p.X.Label.Text = fmt.Sprintf("Date from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
 	p.Y.Label.Text = "Fraction"
 	err = plotutil.AddLines(p, seqFloats(fractions))
 	if err != nil {
 		panic(err)
 	}
+	p.X.Tick.Marker = newDayTicker(p.X.Tick.Marker, start)
 
 	// Save the plot to a PNG file.
 	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
@@ -166,12 +170,13 @@ func drawOpenIssueAge(ctx *context, filename string) {
 	}
 
 	p.Title.Text = "Age of Open Issues"
-	p.X.Label.Text = fmt.Sprintf("Day from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
+	p.X.Label.Text = fmt.Sprintf("Date from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
 	p.Y.Label.Text = "Age (days)"
 	err = plotutil.AddLines(p, "25th percentile", quantileAt(qs, 0.25), "Median", quantileAt(qs, 0.50), "75th percentile", quantileAt(qs, 0.75))
 	if err != nil {
 		panic(err)
 	}
+	p.X.Tick.Marker = newDayTicker(p.X.Tick.Marker, start)
 
 	// Save the plot to a PNG file.
 	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
@@ -213,6 +218,7 @@ func drawIssueSolvedDuration(ctx *context, filename string) {
 	if err != nil {
 		panic(err)
 	}
+	p.X.Tick.Marker = newMonthTicker(p.X.Tick.Marker, start)
 
 	// Save the plot to a PNG file.
 	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
@@ -291,4 +297,37 @@ func quantileAt(ss []*quantile.Stream, q float64) seqFloats {
 		fs[i] = ss[i].Query(q)
 	}
 	return fs
+}
+
+type dateTicker struct {
+	plot.Ticker
+	start    time.Time
+	interval time.Duration
+}
+
+func (dt *dateTicker) Ticks(min, max float64) []plot.Tick {
+	ts := dt.Ticker.Ticks(min, max)
+	for i, t := range ts {
+		if t.Label != "" {
+			t.Label = dt.start.Add(time.Duration(t.Value) * dt.interval).Format(DateFormat)
+		}
+		ts[i] = t
+	}
+	return ts
+}
+
+func newDayTicker(t plot.Ticker, start time.Time) plot.Ticker {
+	return &dateTicker{
+		Ticker:   t,
+		start:    start,
+		interval: DayDuration,
+	}
+}
+
+func newMonthTicker(t plot.Ticker, start time.Time) plot.Ticker {
+	return &dateTicker{
+		Ticker:   t,
+		start:    start,
+		interval: MonthDuration,
+	}
 }
