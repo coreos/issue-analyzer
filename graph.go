@@ -13,7 +13,36 @@ import (
 	"github.com/google/go-github/github"
 )
 
-func drawTotalIssues(ctx *context, filename string) {
+type period struct {
+	ctx   *context
+	start time.Time
+	end   time.Time
+}
+
+func newPeriod(ctx *context, start, end time.Time) *period {
+	p := &period{ctx, start, end}
+	if start.IsZero() || ctx.StartTime().After(start) {
+		p.start = ctx.StartTime()
+	}
+	if end.IsZero() || ctx.EndTime().Before(end) {
+		p.end = ctx.EndTime()
+	}
+	return p
+}
+
+func (p *period) seqInts(a []int, interval time.Duration) seqInts {
+	i := p.start.Sub(p.ctx.StartTime()) / interval
+	j := p.end.Sub(p.ctx.StartTime()) / interval
+	return a[i:j]
+}
+
+func (p *period) seqFloats(a []float64, interval time.Duration) seqFloats {
+	i := p.start.Sub(p.ctx.StartTime()) / interval
+	j := p.end.Sub(p.ctx.StartTime()) / interval
+	return a[i:j]
+}
+
+func drawTotalIssues(ctx *context, per *period, filename string) {
 	start, end := ctx.StartTime(), ctx.EndTime()
 
 	l := end.Sub(start)/DayDuration + 1
@@ -36,13 +65,13 @@ func drawTotalIssues(ctx *context, filename string) {
 	}
 
 	p.Title.Text = "Total Issues/PR"
-	p.X.Label.Text = fmt.Sprintf("Date from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
+	p.X.Label.Text = fmt.Sprintf("Date from %s to %s", per.start.Format(DateFormat), per.end.Format(DateFormat))
 	p.Y.Label.Text = "Count"
-	err = plotutil.AddLines(p, "issues", seqInts(issues), "PRs", seqInts(prs))
+	err = plotutil.AddLines(p, "issues", per.seqInts(issues, DayDuration), "PRs", per.seqInts(prs, DayDuration))
 	if err != nil {
 		panic(err)
 	}
-	p.X.Tick.Marker = newDayTicker(p.X.Tick.Marker, start)
+	p.X.Tick.Marker = newDayTicker(p.X.Tick.Marker, per.start)
 
 	// Save the plot to a PNG file.
 	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
@@ -50,7 +79,7 @@ func drawTotalIssues(ctx *context, filename string) {
 	}
 }
 
-func drawOpenIssues(ctx *context, filename string) {
+func drawOpenIssues(ctx *context, per *period, filename string) {
 	start, end := ctx.StartTime(), ctx.EndTime()
 
 	l := end.Sub(start)/DayDuration + 1
@@ -77,13 +106,13 @@ func drawOpenIssues(ctx *context, filename string) {
 	}
 
 	p.Title.Text = "Open Issues/PR"
-	p.X.Label.Text = fmt.Sprintf("Date from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
+	p.X.Label.Text = fmt.Sprintf("Date from %s to %s", per.start.Format(DateFormat), per.end.Format(DateFormat))
 	p.Y.Label.Text = "Count"
-	err = plotutil.AddLines(p, "issues", seqInts(issues), "PRs", seqInts(prs))
+	err = plotutil.AddLines(p, "issues", per.seqInts(issues, DayDuration), "PRs", per.seqInts(prs, DayDuration))
 	if err != nil {
 		panic(err)
 	}
-	p.X.Tick.Marker = newDayTicker(p.X.Tick.Marker, start)
+	p.X.Tick.Marker = newDayTicker(p.X.Tick.Marker, per.start)
 
 	// Save the plot to a PNG file.
 	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
@@ -91,7 +120,7 @@ func drawOpenIssues(ctx *context, filename string) {
 	}
 }
 
-func drawOpenIssueFraction(ctx *context, filename string) {
+func drawOpenIssueFraction(ctx *context, per *period, filename string) {
 	start, end := ctx.StartTime(), ctx.EndTime()
 
 	l := end.Sub(start)/DayDuration + 1
@@ -127,13 +156,13 @@ func drawOpenIssueFraction(ctx *context, filename string) {
 	}
 
 	p.Title.Text = "Open:Total Issues"
-	p.X.Label.Text = fmt.Sprintf("Date from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
+	p.X.Label.Text = fmt.Sprintf("Date from %s to %s", per.start.Format(DateFormat), per.end.Format(DateFormat))
 	p.Y.Label.Text = "Fraction"
-	err = plotutil.AddLines(p, seqFloats(fractions))
+	err = plotutil.AddLines(p, per.seqFloats(fractions, DayDuration))
 	if err != nil {
 		panic(err)
 	}
-	p.X.Tick.Marker = newDayTicker(p.X.Tick.Marker, start)
+	p.X.Tick.Marker = newDayTicker(p.X.Tick.Marker, per.start)
 
 	// Save the plot to a PNG file.
 	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
@@ -141,7 +170,7 @@ func drawOpenIssueFraction(ctx *context, filename string) {
 	}
 }
 
-func drawOpenIssueAge(ctx *context, filename string) {
+func drawOpenIssueAge(ctx *context, per *period, filename string) {
 	start, end := ctx.StartTime(), ctx.EndTime()
 
 	l := end.Sub(start)/DayDuration + 1
@@ -170,13 +199,15 @@ func drawOpenIssueAge(ctx *context, filename string) {
 	}
 
 	p.Title.Text = "Age of Open Issues"
-	p.X.Label.Text = fmt.Sprintf("Date from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
+	p.X.Label.Text = fmt.Sprintf("Date from %s to %s", per.start.Format(DateFormat), per.end.Format(DateFormat))
 	p.Y.Label.Text = "Age (days)"
-	err = plotutil.AddLines(p, "25th percentile", quantileAt(qs, 0.25), "Median", quantileAt(qs, 0.50), "75th percentile", quantileAt(qs, 0.75))
+	err = plotutil.AddLines(p, "25th percentile", per.seqFloats(quantileAt(qs, 0.25), DayDuration),
+		"Median", per.seqFloats(quantileAt(qs, 0.50), DayDuration),
+		"75th percentile", per.seqFloats(quantileAt(qs, 0.75), DayDuration))
 	if err != nil {
 		panic(err)
 	}
-	p.X.Tick.Marker = newDayTicker(p.X.Tick.Marker, start)
+	p.X.Tick.Marker = newDayTicker(p.X.Tick.Marker, per.start)
 
 	// Save the plot to a PNG file.
 	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
@@ -184,7 +215,7 @@ func drawOpenIssueAge(ctx *context, filename string) {
 	}
 }
 
-func drawIssueSolvedDuration(ctx *context, filename string) {
+func drawIssueSolvedDuration(ctx *context, per *period, filename string) {
 	start, end := ctx.StartTime(), ctx.EndTime()
 
 	l := end.Sub(start)/MonthDuration + 1
@@ -212,13 +243,13 @@ func drawIssueSolvedDuration(ctx *context, filename string) {
 	}
 
 	p.Title.Text = "Solved Duration of Issues"
-	p.X.Label.Text = fmt.Sprintf("Month from %s to %s", start.Format(DateFormat), end.Format(DateFormat))
+	p.X.Label.Text = fmt.Sprintf("Month from %s to %s", per.start.Format(DateFormat), per.end.Format(DateFormat))
 	p.Y.Label.Text = "Duration (days)"
-	err = plotutil.AddLines(p, "Median", quantileAt(qs, 0.50))
+	err = plotutil.AddLines(p, "Median", per.seqFloats(quantileAt(qs, 0.50), MonthDuration))
 	if err != nil {
 		panic(err)
 	}
-	p.X.Tick.Marker = newMonthTicker(p.X.Tick.Marker, start)
+	p.X.Tick.Marker = newMonthTicker(p.X.Tick.Marker, per.start)
 
 	// Save the plot to a PNG file.
 	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {
@@ -226,10 +257,13 @@ func drawIssueSolvedDuration(ctx *context, filename string) {
 	}
 }
 
-func drawTopReleaseDownloads(ctx *context, filename string) {
+func drawTopReleaseDownloads(ctx *context, per *period, filename string) {
 	var rs releases
 	ctx.WalkReleases(func(r github.RepositoryRelease) {
 		var cnt int
+		if r.CreatedAt.Before(per.start) || r.CreatedAt.After(per.end) {
+			return
+		}
 		for _, a := range r.Assets {
 			cnt += *a.DownloadCount
 		}
@@ -239,7 +273,11 @@ func drawTopReleaseDownloads(ctx *context, filename string) {
 
 	var names []string
 	var downloads []int
-	for i := 0; i < 10; i++ {
+	num := 10
+	if num > len(rs) {
+		num = len(rs)
+	}
+	for i := 0; i < num; i++ {
 		names = append(names, rs[i].name)
 		downloads = append(downloads, rs[i].download)
 	}
@@ -251,13 +289,15 @@ func drawTopReleaseDownloads(ctx *context, filename string) {
 
 	p.Title.Text = "Release Downloads"
 	p.Y.Label.Text = "Download Count"
-	p.NominalX(names...)
-	bars, err := plotter.NewBarChart(ints(downloads), vg.Points(20))
-	if err != nil {
-		panic(err)
+	if len(names) > 0 {
+		p.NominalX(names...)
+		bars, err := plotter.NewBarChart(ints(downloads), vg.Points(20))
+		if err != nil {
+			panic(err)
+		}
+		bars.LineStyle.Width = vg.Length(0)
+		p.Add(bars)
 	}
-	bars.LineStyle.Width = vg.Length(0)
-	p.Add(bars)
 
 	// Save the plot to a PNG file.
 	if err := p.Save(defaultWidth, defaultHeight, filename); err != nil {

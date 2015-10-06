@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 	"os/exec"
 	"runtime"
 	"time"
@@ -28,6 +29,8 @@ func main() {
 	owner := flag.String("owner", "coreos", "the owner in github")
 	repo := flag.String("repo", "etcd", "the repo of the owner in github")
 	token := flag.String("token", "", "access token for github")
+	start := flag.String("start-date", "", "start date of the graph, in format 2000-Jan-01 or 2000-Jan")
+	end := flag.String("end-date", "", "end date of the graph, in format 2000-Jan-01 or 2000-Jan")
 	flag.Parse()
 
 	if *token == "" {
@@ -58,17 +61,33 @@ func main() {
 	}
 	ctx.LoadIssues()
 	ctx.LoadReleases()
+	per := newPeriod(ctx, parseDateString(*start), parseDateString(*end))
 
-	drawTotalIssues(ctx, "total_issues.png")
-	drawOpenIssues(ctx, "open_issues.png")
-	drawOpenIssueFraction(ctx, "open_fraction.png")
-	drawOpenIssueAge(ctx, "open_age.png")
-	drawIssueSolvedDuration(ctx, "solved_duration.png")
-	drawTopReleaseDownloads(ctx, "top_downloads.png")
+	drawTotalIssues(ctx, per, "total_issues.png")
+	drawOpenIssues(ctx, per, "open_issues.png")
+	drawOpenIssueFraction(ctx, per, "open_fraction.png")
+	drawOpenIssueAge(ctx, per, "open_age.png")
+	drawIssueSolvedDuration(ctx, per, "solved_duration.png")
+	drawTopReleaseDownloads(ctx, per, "top_downloads.png")
 	buildImagesHTML("images.html", "total_issues.png", "open_issues.png", "open_fraction.png", "open_age.png", "solved_duration.png", "top_downloads.png")
 	fmt.Printf("saved images and browsing html\n")
 
 	startBrowser("images.html")
+}
+
+func parseDateString(date string) time.Time {
+	if date == "" {
+		return time.Time{}
+	}
+	if t, err := time.Parse("2006-Jan-02", date); err == nil {
+		return t
+	}
+	if t, err := time.Parse("2006-Jan-02", fmt.Sprint(date, "-01")); err == nil {
+		return t
+	}
+	fmt.Fprintf(os.Stderr, "malformat date string %q\n", date)
+	os.Exit(1)
+	return time.Time{}
 }
 
 func buildImagesHTML(html string, images ...string) {
