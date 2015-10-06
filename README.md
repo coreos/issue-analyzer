@@ -18,6 +18,20 @@ Usage
 
 run `./issue-analyzer`, which generates png files at current directory.
 
+Flags:
+```
+  -end-date string
+    	end date of the graph, in format 2000-Jan-01 or 2000-Jan
+  -owner string
+    	the owner in github (default "coreos")
+  -repo string
+    	the repo of the owner in github (default "etcd")
+  -start-date string
+    	start date of the graph, in format 2000-Jan-01 or 2000-Jan
+  -token string
+    	access token for github
+```
+
 Advanced Usage
 --------------
 
