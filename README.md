@@ -12,7 +12,7 @@ Installation
 ------------
 
 ```
-go get github.com/yichengq/issue-analyzer
+go get github.com/coreos/issue-analyzer
 ```
 
 
