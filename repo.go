@@ -7,11 +7,14 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/google/go-github/github"
 	"golang.org/x/oauth2"
 )
+
+const cacheDir = "cache"
 
 type repoClient struct {
 	client *github.Client
@@ -23,8 +26,9 @@ type repoClient struct {
 }
 
 func (c *repoClient) LoadIssues() {
-	issueCacheFilename := fmt.Sprintf("cache/%s_%s_issues.cache", c.owner, c.repo)
-	if err := readJson(issueCacheFilename, &c.issues); err == nil {
+	issueCacheFilename := fmt.Sprintf("%s_%s_issues.cache", c.owner, c.repo)
+	issueCachePath := filepath.Join(cacheDir, issueCacheFilename)
+	if err := readJson(issueCachePath, &c.issues); err == nil {
 		return
 	}
 	c.issues = allIssuesInRepo(c.client, c.owner, c.repo)
@@ -32,8 +36,9 @@ func (c *repoClient) LoadIssues() {
 }
 
 func (c *repoClient) LoadReleases() {
-	cacheFilename := fmt.Sprintf("cache/%s_%s_releases.cache", c.owner, c.repo)
-	if err := readJson(cacheFilename, &c.releases); err == nil {
+	cacheFilename := fmt.Sprintf("%s_%s_releases.cache", c.owner, c.repo)
+	cachePath := filepath.Join(cacheDir, cacheFilename)
+	if err := readJson(cachePath, &c.releases); err == nil {
 		return
 	}
 	c.releases = c.fetchReleases()
@@ -156,6 +161,9 @@ func newRepoClient(owner, repo, token string) *repoClient {
 	if token != "" {
 		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
 		c = oauth2.NewClient(oauth2.NoContext, ts)
+	}
+	if err := os.MkdirAll(cacheDir, 0755); err != nil {
+		panic(err)
 	}
 	return &repoClient{client: github.NewClient(c), owner: owner, repo: repo}
 }
