@@ -14,41 +14,41 @@ import (
 )
 
 type period struct {
-	ctx   *context
+	rc    *repoClient
 	start time.Time
 	end   time.Time
 }
 
-func newPeriod(ctx *context, start, end time.Time) *period {
-	p := &period{ctx, start, end}
-	if start.IsZero() || ctx.StartTime().After(start) {
-		p.start = ctx.StartTime()
+func newPeriod(rc *repoClient, start, end time.Time) *period {
+	p := &period{rc, start, end}
+	if start.IsZero() || rc.StartTime().After(start) {
+		p.start = rc.StartTime()
 	}
-	if end.IsZero() || ctx.EndTime().Before(end) {
-		p.end = ctx.EndTime()
+	if end.IsZero() || rc.EndTime().Before(end) {
+		p.end = rc.EndTime()
 	}
 	return p
 }
 
 func (p *period) seqInts(a []int, interval time.Duration) seqInts {
-	i := p.start.Sub(p.ctx.StartTime()) / interval
-	j := p.end.Sub(p.ctx.StartTime()) / interval
+	i := p.start.Sub(p.rc.StartTime()) / interval
+	j := p.end.Sub(p.rc.StartTime()) / interval
 	return a[i:j]
 }
 
 func (p *period) seqFloats(a []float64, interval time.Duration) seqFloats {
-	i := p.start.Sub(p.ctx.StartTime()) / interval
-	j := p.end.Sub(p.ctx.StartTime()) / interval
+	i := p.start.Sub(p.rc.StartTime()) / interval
+	j := p.end.Sub(p.rc.StartTime()) / interval
 	return a[i:j]
 }
 
-func drawTotalIssues(ctx *context, per *period, filename string) {
-	start, end := ctx.StartTime(), ctx.EndTime()
+func drawTotalIssues(rc *repoClient, per *period, filename string) {
+	start, end := rc.StartTime(), rc.EndTime()
 
 	l := end.Sub(start)/DayDuration + 1
 	issues := make([]int, l)
 	prs := make([]int, l)
-	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
+	rc.WalkIssues(func(i github.Issue, isPullRequest bool) {
 		c := i.CreatedAt
 		for k := c.Sub(start) / DayDuration; k <= end.Sub(start)/DayDuration; k++ {
 			if isPullRequest {
@@ -79,13 +79,13 @@ func drawTotalIssues(ctx *context, per *period, filename string) {
 	}
 }
 
-func drawOpenIssues(ctx *context, per *period, filename string) {
-	start, end := ctx.StartTime(), ctx.EndTime()
+func drawOpenIssues(rc *repoClient, per *period, filename string) {
+	start, end := rc.StartTime(), rc.EndTime()
 
 	l := end.Sub(start)/DayDuration + 1
 	issues := make([]int, l)
 	prs := make([]int, l)
-	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
+	rc.WalkIssues(func(i github.Issue, isPullRequest bool) {
 		created := i.CreatedAt
 		closed := end
 		if i.ClosedAt != nil {
@@ -120,13 +120,13 @@ func drawOpenIssues(ctx *context, per *period, filename string) {
 	}
 }
 
-func drawOpenIssueFraction(ctx *context, per *period, filename string) {
-	start, end := ctx.StartTime(), ctx.EndTime()
+func drawOpenIssueFraction(rc *repoClient, per *period, filename string) {
+	start, end := rc.StartTime(), rc.EndTime()
 
 	l := end.Sub(start)/DayDuration + 1
 	totals := make([]int, l)
 	opens := make([]int, l)
-	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
+	rc.WalkIssues(func(i github.Issue, isPullRequest bool) {
 		if isPullRequest {
 			return
 		}
@@ -170,15 +170,15 @@ func drawOpenIssueFraction(ctx *context, per *period, filename string) {
 	}
 }
 
-func drawOpenIssueAge(ctx *context, per *period, filename string) {
-	start, end := ctx.StartTime(), ctx.EndTime()
+func drawOpenIssueAge(rc *repoClient, per *period, filename string) {
+	start, end := rc.StartTime(), rc.EndTime()
 
 	l := end.Sub(start)/DayDuration + 1
 	qs := make([]*quantile.Stream, l)
 	for i := range qs {
 		qs[i] = quantile.NewTargeted(0.25, 0.50, 0.75)
 	}
-	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
+	rc.WalkIssues(func(i github.Issue, isPullRequest bool) {
 		if isPullRequest {
 			return
 		}
@@ -215,15 +215,15 @@ func drawOpenIssueAge(ctx *context, per *period, filename string) {
 	}
 }
 
-func drawIssueSolvedDuration(ctx *context, per *period, filename string) {
-	start, end := ctx.StartTime(), ctx.EndTime()
+func drawIssueSolvedDuration(rc *repoClient, per *period, filename string) {
+	start, end := rc.StartTime(), rc.EndTime()
 
 	l := end.Sub(start)/MonthDuration + 1
 	qs := make([]*quantile.Stream, l)
 	for i := range qs {
 		qs[i] = quantile.NewTargeted(0.50)
 	}
-	ctx.WalkIssues(func(i github.Issue, isPullRequest bool) {
+	rc.WalkIssues(func(i github.Issue, isPullRequest bool) {
 		if isPullRequest {
 			return
 		}
@@ -257,9 +257,9 @@ func drawIssueSolvedDuration(ctx *context, per *period, filename string) {
 	}
 }
 
-func drawTopReleaseDownloads(ctx *context, per *period, filename string) {
+func drawTopReleaseDownloads(rc *repoClient, per *period, filename string) {
 	var rs releases
-	ctx.WalkReleases(func(r github.RepositoryRelease) {
+	rc.WalkReleases(func(r github.RepositoryRelease) {
 		var cnt int
 		if r.CreatedAt.Before(per.start) || r.CreatedAt.After(per.end) {
 			return

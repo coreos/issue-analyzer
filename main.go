@@ -4,15 +4,12 @@ import (
 	"flag"
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"os/exec"
 	"runtime"
 	"time"
 
 	"github.com/gonum/plot/vg"
-	"github.com/google/go-github/github"
-	"golang.org/x/oauth2"
 )
 
 const (
@@ -38,37 +35,27 @@ func main() {
 			*token = string(data)
 		}
 	}
-
-	var c *http.Client
 	if *token == "" {
 		fmt.Println("Using unauthenticated client because oauth2 token is unavailable,")
 		fmt.Println("whose rate is limited to 60 requests per hour.")
 		fmt.Println("Learn more about GitHub rate limiting at http://developer.github.com/v3/#rate-limiting.")
 		fmt.Println("If you want to use authenticated client, please save your oauth token into file './.oauth2_token'.")
 	} else {
-		ts := oauth2.StaticTokenSource(
-			&oauth2.Token{AccessToken: *token},
-		)
-		c = oauth2.NewClient(oauth2.NoContext, ts)
 		fmt.Println("Using authenticated client whose rate is up to 5000 requests per hour.")
 	}
-	client := github.NewClient(c)
 
-	ctx := &context{
-		client: client,
-		owner:  *owner,
-		repo:   *repo,
-	}
-	ctx.LoadIssues()
-	ctx.LoadReleases()
-	per := newPeriod(ctx, parseDateString(*start), parseDateString(*end))
+	rc := newRepoClient(*owner, *repo, *token)
 
-	drawTotalIssues(ctx, per, "total_issues.png")
-	drawOpenIssues(ctx, per, "open_issues.png")
-	drawOpenIssueFraction(ctx, per, "open_fraction.png")
-	drawOpenIssueAge(ctx, per, "open_age.png")
-	drawIssueSolvedDuration(ctx, per, "solved_duration.png")
-	drawTopReleaseDownloads(ctx, per, "top_downloads.png")
+	rc.LoadIssues()
+	rc.LoadReleases()
+	per := newPeriod(rc, parseDateString(*start), parseDateString(*end))
+
+	drawTotalIssues(rc, per, "total_issues.png")
+	drawOpenIssues(rc, per, "open_issues.png")
+	drawOpenIssueFraction(rc, per, "open_fraction.png")
+	drawOpenIssueAge(rc, per, "open_age.png")
+	drawIssueSolvedDuration(rc, per, "solved_duration.png")
+	drawTopReleaseDownloads(rc, per, "top_downloads.png")
 	buildImagesHTML("images.html", "total_issues.png", "open_issues.png", "open_fraction.png", "open_age.png", "solved_duration.png", "top_downloads.png")
 	fmt.Printf("saved images and browsing html\n")
 

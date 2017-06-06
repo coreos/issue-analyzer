@@ -1,25 +1,28 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"net/http"
 	"os"
 	"time"
 
 	"github.com/google/go-github/github"
+	"golang.org/x/oauth2"
 )
 
-type context struct {
+type repoClient struct {
 	client *github.Client
 	owner  string
 	repo   string
 
-	issues   []github.Issue
-	releases []github.RepositoryRelease
+	issues   []*github.Issue
+	releases []*github.RepositoryRelease
 }
 
-func (c *context) LoadIssues() {
+func (c *repoClient) LoadIssues() {
 	issueCacheFilename := fmt.Sprintf("cache/%s_%s_issues.cache", c.owner, c.repo)
 	if err := readJson(issueCacheFilename, &c.issues); err == nil {
 		return
@@ -28,7 +31,7 @@ func (c *context) LoadIssues() {
 	writeJson(issueCacheFilename, c.issues)
 }
 
-func (c *context) LoadReleases() {
+func (c *repoClient) LoadReleases() {
 	cacheFilename := fmt.Sprintf("cache/%s_%s_releases.cache", c.owner, c.repo)
 	if err := readJson(cacheFilename, &c.releases); err == nil {
 		return
@@ -37,7 +40,7 @@ func (c *context) LoadReleases() {
 	writeJson(cacheFilename, c.releases)
 }
 
-func (c *context) StartTime() time.Time {
+func (c *repoClient) StartTime() time.Time {
 	first := time.Now()
 	for _, i := range c.issues {
 		if i.CreatedAt.Before(first) {
@@ -47,27 +50,27 @@ func (c *context) StartTime() time.Time {
 	return first
 }
 
-func (c *context) EndTime() time.Time { return time.Now() }
+func (c *repoClient) EndTime() time.Time { return time.Now() }
 
-func (c *context) WalkIssues(f func(issue github.Issue, isPullRequest bool)) {
+func (c *repoClient) WalkIssues(f func(issue github.Issue, isPullRequest bool)) {
 	for _, issue := range c.issues {
-		f(issue, issue.PullRequestLinks != nil)
+		f(*issue, issue.PullRequestLinks != nil)
 	}
 }
 
-func (c *context) WalkReleases(f func(r github.RepositoryRelease)) {
+func (c *repoClient) WalkReleases(f func(r github.RepositoryRelease)) {
 	for _, r := range c.releases {
-		f(r)
+		f(*r)
 	}
 }
 
-func (c *context) fetchReleases() []github.RepositoryRelease {
+func (c *repoClient) fetchReleases() []*github.RepositoryRelease {
 	opt := &github.ListOptions{
 		PerPage: 100,
 	}
-	var releases []github.RepositoryRelease
+	var releases []*github.RepositoryRelease
 	for i := 0; ; i++ {
-		rs, resp, err := c.client.Repositories.ListReleases(c.owner, c.repo, opt)
+		rs, resp, err := c.client.Repositories.ListReleases(context.TODO(), c.owner, c.repo, opt)
 		if err != nil {
 			fmt.Printf("error listing releases (%v)\n", err)
 			os.Exit(1)
@@ -81,8 +84,8 @@ func (c *context) fetchReleases() []github.RepositoryRelease {
 	return releases
 }
 
-func allIssuesInRepo(client *github.Client, owner, repo string) []github.Issue {
-	rate, _, err := client.RateLimits()
+func allIssuesInRepo(client *github.Client, owner, repo string) []*github.Issue {
+	rate, _, err := client.RateLimits(context.TODO())
 	if err != nil {
 		fmt.Printf("error fetching rate limit (%v)\n", err)
 	} else {
@@ -92,12 +95,13 @@ func allIssuesInRepo(client *github.Client, owner, repo string) []github.Issue {
 	opt := &github.IssueListByRepoOptions{
 		State: "all",
 		ListOptions: github.ListOptions{
-			PerPage: 100,
+			// github API limits to 100 now, but try to fetch more
+			PerPage: 300,
 		},
 	}
-	var issues []github.Issue
+	var issues []*github.Issue
 	for i := 0; ; i++ {
-		is, resp, err := client.Issues.ListByRepo(owner, repo, opt)
+		is, resp, err := client.Issues.ListByRepo(context.TODO(), owner, repo, opt)
 		if err != nil {
 			fmt.Printf("error listing issues (%v)\n", err)
 			os.Exit(1)
@@ -145,4 +149,13 @@ func fileModTime(name string) time.Time {
 		return time.Time{}
 	}
 	return st.ModTime()
+}
+
+func newRepoClient(owner, repo, token string) *repoClient {
+	var c *http.Client
+	if token != "" {
+		ts := oauth2.StaticTokenSource(&oauth2.Token{AccessToken: token})
+		c = oauth2.NewClient(oauth2.NoContext, ts)
+	}
+	return &repoClient{client: github.NewClient(c), owner: owner, repo: repo}
 }
