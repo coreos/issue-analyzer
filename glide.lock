@@ -1,0 +1,85 @@
+hash: 897c1d4a7031a1d27f41d8f366e93597b3acce123bbe0704383bb008a6e01d55
+updated: 2017-06-06T12:40:49.872338688-07:00
+imports:
+- name: bitbucket.org/zombiezen/gopdf
+  version: 1c63dc69751bc45441c2ce1f56b631c55294b4d5
+  subpackages:
+  - pdf
+- name: github.com/ajstarks/svgo
+  version: fec71ff44529c89ddb4211a62f3d672f31e50bc5
+- name: github.com/bmizerany/perks
+  version: d9a9656a3a4b1c2864fdb44db2ef8619772d92aa
+  subpackages:
+  - quantile
+- name: github.com/golang/freetype
+  version: bcfeb16b74e8aea9e2fe043406f2ef74b1cb0759
+  subpackages:
+  - raster
+  - truetype
+- name: github.com/golang/protobuf
+  version: 5a0f697c9ed9d68fef0116532c6e05cfeae00e55
+  subpackages:
+  - proto
+- name: github.com/gonum/floats
+  version: a2cbc5c70616cd18491ef2843231f6ce28b2cb02
+- name: github.com/gonum/internal
+  version: 4c20688f849035792bcee8a94ec93b5c277c919f
+  subpackages:
+  - asm/f64
+- name: github.com/gonum/plot
+  version: 395bf7867dd5a3c85271e0b53fb222d8516d3750
+  subpackages:
+  - palette
+  - plotter
+  - plotutil
+  - tools/bezier
+  - vg
+  - vg/draw
+  - vg/fonts
+  - vg/vgeps
+  - vg/vgimg
+  - vg/vgpdf
+  - vg/vgsvg
+- name: github.com/google/go-github
+  version: 7a51fb928f52a196d5f31daefb8a489453ef54ff
+  subpackages:
+  - github
+- name: github.com/google/go-querystring
+  version: 53e6ce116135b80d037921a7fdd5138cf32d7a8a
+  subpackages:
+  - query
+- name: github.com/llgcode/draw2d
+  version: dcbfbe505d35de8166ccfc47ff9e4bb020473e18
+  subpackages:
+  - draw2dbase
+  - draw2dimg
+- name: golang.org/x/image
+  version: 426cfd8eeb6e08ab1932954e09e3c2cb2bc6e36d
+  subpackages:
+  - draw
+  - font
+  - math/f64
+  - math/fixed
+  - tiff
+  - tiff/lzw
+- name: golang.org/x/net
+  version: 59a0b19b5533c7977ddeb86b017bf507ed407b12
+  subpackages:
+  - context
+- name: golang.org/x/oauth2
+  version: f047394b6d14284165300fd82dad67edb3a4d7f6
+  subpackages:
+  - internal
+- name: google.golang.org/appengine
+  version: a2f4131514e563cedfdb6e7d267df9ad48591e93
+  subpackages:
+  - internal
+  - internal/app_identity
+  - internal/base
+  - internal/datastore
+  - internal/log
+  - internal/modules
+  - internal/remote_api
+  - internal/urlfetch
+  - urlfetch
+testImports: []

@@ -1,0 +1,10 @@
+package: github.com/coreos/issue-analyzer
+import:
+- package: github.com/google/go-github/github
+  version: 7a51fb928f52a196d5f31daefb8a489453ef54ff
+- package: golang.org/x/oauth2
+  version: f047394b6d14284165300fd82dad67edb3a4d7f6
+- package: github.com/gonum/plot
+  version: 395bf7867dd5a3c85271e0b53fb222d8516d3750
+- package: github.com/bmizerany/perks/quantile
+  version: d9a9656a3a4b1c2864fdb44db2ef8619772d92aa
