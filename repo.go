@@ -32,7 +32,7 @@ func (c *repoClient) LoadIssues() {
 		return
 	}
 	c.issues = allIssuesInRepo(c.client, c.owner, c.repo)
-	writeJson(issueCacheFilename, c.issues)
+	writeJson(issueCachePath, c.issues)
 }
 
 func (c *repoClient) LoadReleases() {
@@ -42,7 +42,7 @@ func (c *repoClient) LoadReleases() {
 		return
 	}
 	c.releases = c.fetchReleases()
-	writeJson(cacheFilename, c.releases)
+	writeJson(cachePath, c.releases)
 }
 
 func (c *repoClient) StartTime() time.Time {
